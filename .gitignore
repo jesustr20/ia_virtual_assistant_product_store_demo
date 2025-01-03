@@ -8,6 +8,10 @@ media
 /fooddelivery/db.sqlite3
 credenciales.md
 .env
+.sqlite3
+.db
+.sql
+.csv
 
 # Backup files # 
 *.bak 
