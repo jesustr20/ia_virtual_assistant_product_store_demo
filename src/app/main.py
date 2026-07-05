@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from .infrastructure.db.session import init_db, SessionLocal
+from .infrastructure.db.session import init_db
 from .api.routes.ai_routes import router as ai_router
 from .api.routes.product_routes import router as product_router
 
