@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Instalar dependencias
+        run: uv sync
+
+      - name: Lint con ruff
+        run: uv run ruff check .
+
+      - name: Smoke test — la app importa sin romperse
+        run: uv run python -c "import sys; sys.path.insert(0, 'src'); from app.main import app; print('App importa OK')"
