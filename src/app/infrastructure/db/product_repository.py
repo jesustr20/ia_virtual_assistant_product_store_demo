@@ -1,8 +1,9 @@
 from sqlalchemy.orm import Session
 from .models import Product
-from .schemas import ProductCreate
+from ...api.schemas.product_schemas import ProductCreate
+from ...domain.ports.product_repository_port import ProductRepositoryPort
 
-class ProductRepository:
+class ProductRepository(ProductRepositoryPort):
     def __init__(self, db: Session):
         self.db = db
 
@@ -25,4 +26,14 @@ class ProductRepository:
             return None  # Maneja esto en el endpoint para devolver un 404 o similar
         self.db.delete(product)
         self.db.commit()
+        return product
+    
+    def update_product(self, product_id: int, product_data: ProductCreate):
+        product = self.get_products_by_id(product_id)
+        if not product:
+            return None
+        for key, value in product_data.model_dump().items():
+            setattr(product, key, value)
+        self.db.commit()
+        self.db.refresh(product)
         return product

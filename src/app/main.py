@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from .db import init_db, SessionLocal
-from .endpoints import ai_endpoints
-from .endpoints.product_endpoints import router as product_router
+from .infrastructure.db.session import init_db, SessionLocal
+from .api.routes.ai_routes import router as ai_router
+from .api.routes.product_routes import router as product_router
 
 app = FastAPI()
 
@@ -9,5 +9,5 @@ app = FastAPI()
 def startup():
     init_db()
 
-app.include_router(ai_endpoints.router, prefix="/ai", tags=["IA"])
+app.include_router(ai_router, prefix="/ai", tags=["IA"])
 app.include_router(product_router, prefix="/product", tags=["Productos"])

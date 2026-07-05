@@ -1,7 +1,7 @@
 import google.generativeai as genai
-from .session_memory import SessionMemory
-from ..repositories import ProductRepository
-from ..services.ai_handler import AIHandler
+from ..memory.session_memory import SessionMemory
+from app.infrastructure.db.product_repository import ProductRepository
+from app.application.legacy_ai_handler import AIHandler
 
 class GeminiService:
     def __init__(self, api_key: str, product_repo: ProductRepository):

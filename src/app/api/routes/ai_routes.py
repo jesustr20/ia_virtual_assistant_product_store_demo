@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.services.gemini_service import GeminiService
-from app.db import get_db
-from app.repositories import ProductRepository
+from app.infrastructure.llm.gemini_adapter import GeminiService
+from app.infrastructure.db.session import get_db
+from app.infrastructure.db.product_repository import ProductRepository
 import os
 from dotenv import load_dotenv
 
