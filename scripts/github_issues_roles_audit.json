@@ -1,0 +1,20 @@
+[
+  {
+    "title": "#28 [feat] Roles y permisos (admin/user) sobre el sistema de auth",
+    "labels": [
+      "feat",
+      "fase-1",
+      "intermedio"
+    ],
+    "body": "## Objetivo\nExtender el sistema de autenticación del issue #2 con roles: el primer usuario registrado en el sistema queda como `admin` automáticamente, los siguientes se registran como `user` por defecto. Agregar una dependency `require_admin` que además de validar el JWT, verifique el rol antes de permitir crear/editar/borrar productos.\n\n## Por qué\nHoy (post issue #2), cualquier usuario que se registre tiene los mismos permisos que el dueño de la tienda — no hay jerarquía. Con múltiples personas administrando el catálogo (dueño + empleados), hace falta distinguir quién puede modificar qué.\n\n## Criterios de aceptación\n- [ ] Columna `role` en el modelo `User`, default `user`\n- [ ] El primer usuario registrado en el sistema queda como `admin` automáticamente\n- [ ] El `role` viaja dentro del JWT (no requiere consultar la DB en cada request)\n- [ ] Dependency `require_admin` que rechaza con 403 a usuarios sin rol admin\n- [ ] Endpoints de creación/edición/borrado de productos protegidos con `require_admin` en vez de solo `get_current_user`\n- [ ] Probado: un segundo usuario registrado no puede borrar productos, el primero sí"
+  },
+  {
+    "title": "#29 [feat] Auditoria: registrar quien crea, edita o borra productos",
+    "labels": [
+      "feat",
+      "fase-6",
+      "suave"
+    ],
+    "body": "## Objetivo\nRegistrar en logs (o en una tabla dedicada) qué usuario realizó cada acción de modificación sobre el catálogo (crear, editar, borrar productos), aprovechando que `current_user` ya está disponible en los endpoints protegidos desde el issue #2.\n\n## Por qué\nSin esto, si un producto se borra o edita incorrectamente, no hay forma de saber quién lo hizo ni cuándo — importante en cuanto haya más de un administrador (ver issue #28).\n\n## Criterios de aceptación\n- [ ] Cada creación/edición/borrado de producto queda registrada con: usuario, acción, timestamp\n- [ ] Decidido si se guarda en logs estructurados (conecta con issue #15) o en una tabla `audit_log` separada\n- [ ] Probado: se puede reconstruir \"quién borró el producto X y cuándo\" a partir de los registros"
+  }
+]
