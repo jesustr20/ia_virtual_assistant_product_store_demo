@@ -23,4 +23,6 @@ jobs:
         run: uv run ruff check .
 
       - name: Smoke test — la app importa sin romperse
+        env:
+          DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/ci_db
         run: uv run python -c "import sys; sys.path.insert(0, 'src'); from app.main import app; print('App importa OK')"
