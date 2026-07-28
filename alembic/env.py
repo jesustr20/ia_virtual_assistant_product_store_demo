@@ -11,7 +11,7 @@ from alembic import context
 # access to the values within the .ini file in use.
 config = context.config
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv # noqa: E402
 load_dotenv()
 
 config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL"))
@@ -23,7 +23,8 @@ if config.config_file_name is not None:
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from app.infrastructure.db.session import Base
+from app.infrastructure.db.session import Base # noqa: E402
+from app.infrastructure.db.models import Product, User  # noqa: E402,F401 # importar los modelos registra las tablas en Base.metadata
 
 target_metadata = Base.metadata
 
