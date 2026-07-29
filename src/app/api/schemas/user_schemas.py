@@ -12,3 +12,6 @@ class UserCreate(BaseModel):
             raise ValueError('Passwords do not match')
         return self
 
+class UserLogin(BaseModel):
+    username: str
+    password: str
