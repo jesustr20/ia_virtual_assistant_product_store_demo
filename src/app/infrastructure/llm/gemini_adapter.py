@@ -7,7 +7,7 @@ class GeminiService:
     def __init__(self, api_key: str, product_repo: ProductRepository):
         genai.configure(api_key=api_key)
         self.product_repo = product_repo        
-        self.model = genai.GenerativeModel("gemini-1.5-flash")
+        self.model = genai.GenerativeModel("gemini-3.5-flash-lite")
         self.ai_handler = AIHandler()
         self.session_memory = SessionMemory()
 

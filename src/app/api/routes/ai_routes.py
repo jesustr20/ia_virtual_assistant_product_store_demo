@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.infrastructure.llm.gemini_adapter import GeminiService
 from app.infrastructure.db.session import get_db
 from app.infrastructure.db.product_repository import ProductRepository
+from app.api.schemas.ai_schemas import AskAIRequest
 import os
 from dotenv import load_dotenv
 
@@ -10,10 +11,11 @@ load_dotenv()
 
 router = APIRouter()
 
-@router.get("/ask_ai")
-def ask_ai(question: str, db: Session = Depends(get_db)):
+@router.post("/ask_ai")
+def ask_ai(request: AskAIRequest, db: Session = Depends(get_db)):
+    print(f"DEBUG - GEMINI_API_KEY: {repr(os.getenv('GEMINI_API_KEY'))}")
     gemini_service = GeminiService(api_key=os.getenv("GEMINI_API_KEY"), product_repo=ProductRepository(db))
-    if "producto" in question.lower():
-        return {"respuesta": gemini_service.respond_with_products(question)}
+    if "producto" in request.question.lower():
+        return {"respuesta": gemini_service.respond_with_products(request.question)}
     else:
-        return {"respuesta": gemini_service.get_humanlike_response(question)}
+        return {"respuesta": gemini_service.get_humanlike_response(request.question)}
