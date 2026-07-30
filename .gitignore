@@ -143,3 +143,6 @@ GitHub.sublime-settings
 !.vscode/launch.json 
 !.vscode/extensions.json 
 .historystore.db
+
+# CodeGraph (índice local, se regenera solo)
+.codegraph/
