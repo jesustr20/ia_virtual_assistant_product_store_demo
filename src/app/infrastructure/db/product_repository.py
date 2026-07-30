@@ -37,3 +37,14 @@ class ProductRepository(ProductRepositoryPort):
         self.db.commit()
         self.db.refresh(product)
         return product
+
+    def search_products(self, query: str):
+        search_term = f"%{query}%"
+        return (
+            self.db.query(Product)
+            .filter(
+                (Product.name.ilike(search_term))
+                | (Product.description.ilike(search_term))
+            )
+            .all()
+        )

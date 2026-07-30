@@ -21,3 +21,7 @@ class ProductRepositoryPort(ABC):
     @abstractmethod
     def delete_product(self, product_id):
         pass
+
+    @abstractmethod
+    def search_products(self, query):
+        pass
