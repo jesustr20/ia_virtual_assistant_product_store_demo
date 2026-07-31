@@ -4,6 +4,7 @@ from langchain.agents import create_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from ...application.product_service import ProductService
+from ...domain.entities.conversation_message import ConversationMessage
 from .product_tools import build_catalog_tools
 
 SYSTEM_PROMPT = """Sos el asistente de Catálogo y Ventas de una tienda online.
@@ -26,9 +27,22 @@ def build_catalog_agent(product_service: ProductService, api_key: str | None = N
     return create_agent(model=llm, tools=tools, system_prompt=SYSTEM_PROMPT)
 
 
-def run_catalog_agent(product_service: ProductService, message: str, api_key: str | None = None) -> str:
+def run_catalog_agent(
+    product_service: ProductService,
+    message: str,
+    history: list[ConversationMessage] | None = None,
+    api_key: str | None = None,
+) -> str:
+    """Ejecuta el agente de Catálogo con el historial de la sesión como contexto previo.
+
+    `history` son los turnos anteriores de la misma sesión (ver `ConversationMemoryPort`),
+    en orden cronológico. Se anteponen al mensaje nuevo para que el agente pueda resolver
+    referencias como "esas" o "ese producto" a partir de lo hablado antes.
+    """
     agent = build_catalog_agent(product_service, api_key=api_key)
-    result = agent.invoke({"messages": [{"role": "user", "content": message}]})
+    messages = [{"role": m.role, "content": m.content} for m in (history or [])]
+    messages.append({"role": "user", "content": message})
+    result = agent.invoke({"messages": messages})
     final_message = result["messages"][-1]
     return _extract_text(final_message.content)
 
