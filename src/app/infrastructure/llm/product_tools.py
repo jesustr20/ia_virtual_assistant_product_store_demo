@@ -2,30 +2,45 @@ from langchain_core.tools import tool
 
 from ...application.product_service import ProductService
 from ...core.exceptions import NotFoundError
+from ...domain.ports.vector_store_port import VectorStorePort
 
 
-def build_catalog_tools(product_service: ProductService) -> list:
+def build_catalog_tools(product_service: ProductService, vector_store: VectorStorePort) -> list:
     """Construye las tools de LangChain para el agente de Catálogo/Ventas.
 
-    Las tools quedan atadas (closure) a la instancia de ProductService recibida,
-    que a su vez encapsula el ProductRepositoryPort correspondiente a la request.
+    Las tools quedan atadas (closure) a la instancia de ProductService y al
+    VectorStorePort recibidos, que a su vez encapsulan el ProductRepositoryPort
+    y el backend de vectores correspondientes a la request.
     """
 
     @tool
-    def buscar_producto(nombre_o_categoria: str) -> str:
-        """Busca productos por nombre o categoría (coincidencia parcial).
+    def buscar_producto(consulta: str) -> str:
+        """Busca productos por similitud semántica a partir de una consulta en lenguaje natural.
+
+        La búsqueda no requiere coincidencia textual exacta con el nombre del producto:
+        encuentra productos relacionados por significado (ej. "calzado deportivo para
+        correr" puede encontrar "Zapatillas Running Pro").
 
         Args:
-            nombre_o_categoria: texto a buscar en el nombre o descripción del producto.
+            consulta: descripción de lo que el usuario busca.
         """
-        productos = product_service.search_products(nombre_o_categoria)
-        if not productos:
-            return f"No se encontraron productos que coincidan con '{nombre_o_categoria}'."
+        resultados = vector_store.search(consulta, k=5)
+        if not resultados:
+            return f"No se encontraron productos relacionados con '{consulta}'."
 
-        lineas = [
-            f"id={p.id} | {p.name} | ${p.price} | stock={p.stock} | {p.description}"
-            for p in productos
-        ]
+        lineas = []
+        for resultado in resultados:
+            product_id = resultado.metadata.get("product_id")
+            producto = (
+                product_service.get_product_by_id(product_id) if product_id is not None else None
+            )
+            if producto:
+                lineas.append(
+                    f"id={producto.id} | {producto.name} | ${producto.price} | "
+                    f"stock={producto.stock} | {producto.description}"
+                )
+            else:
+                lineas.append(f"id={product_id} | {resultado.text}")
         return "\n".join(lineas)
 
     @tool
@@ -65,3 +80,4 @@ def build_catalog_tools(product_service: ProductService) -> list:
         )
 
     return [buscar_producto, consultar_stock, calcular_precio]
+

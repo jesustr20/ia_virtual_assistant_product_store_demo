@@ -5,6 +5,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from ...application.product_service import ProductService
 from ...domain.entities.conversation_message import ConversationMessage
+from ...domain.ports.vector_store_port import VectorStorePort
 from .product_tools import build_catalog_tools
 
 SYSTEM_PROMPT = """Sos el asistente de Catálogo y Ventas de una tienda online.
@@ -13,7 +14,11 @@ descuento. Usá siempre las herramientas disponibles para responder con datos re
 en lugar de inventar información. Respondé en español, de forma breve y clara."""
 
 
-def build_catalog_agent(product_service: ProductService, api_key: str | None = None):
+def build_catalog_agent(
+    product_service: ProductService,
+    vector_store: VectorStorePort,
+    api_key: str | None = None,
+):
     """Construye un agente de LangChain con las tools de catálogo registradas.
 
     Se crea por request porque las tools quedan atadas al ProductService (y por lo
@@ -23,12 +28,13 @@ def build_catalog_agent(product_service: ProductService, api_key: str | None = N
         model="gemini-3.5-flash-lite",
         google_api_key=api_key or os.getenv("GEMINI_API_KEY"),
     )
-    tools = build_catalog_tools(product_service)
+    tools = build_catalog_tools(product_service, vector_store)
     return create_agent(model=llm, tools=tools, system_prompt=SYSTEM_PROMPT)
 
 
 def run_catalog_agent(
     product_service: ProductService,
+    vector_store: VectorStorePort,
     message: str,
     history: list[ConversationMessage] | None = None,
     api_key: str | None = None,
@@ -39,7 +45,7 @@ def run_catalog_agent(
     en orden cronológico. Se anteponen al mensaje nuevo para que el agente pueda resolver
     referencias como "esas" o "ese producto" a partir de lo hablado antes.
     """
-    agent = build_catalog_agent(product_service, api_key=api_key)
+    agent = build_catalog_agent(product_service, vector_store, api_key=api_key)
     messages = [{"role": m.role, "content": m.content} for m in (history or [])]
     messages.append({"role": "user", "content": message})
     result = agent.invoke({"messages": messages})
