@@ -15,5 +15,9 @@ class VectorStorePort(ABC):
         """Indexa un lote de documentos (si un id ya existe, lo reemplaza)."""
 
     @abstractmethod
+    def delete_document(self, doc_id: str) -> None:
+        """Elimina un documento del índice por su id (no-op si no existe)."""
+
+    @abstractmethod
     def search(self, query: str, k: int = 5) -> list[VectorSearchResult]:
         """Devuelve los `k` documentos más similares semánticamente a `query`."""

@@ -47,6 +47,9 @@ class ChromaDBAdapter(VectorStorePort):
         vectors = self._embeddings.embed_documents(texts)
         self._collection.upsert(ids=ids, embeddings=vectors, documents=texts, metadatas=metadatas)
 
+    def delete_document(self, doc_id: str) -> None:
+        self._collection.delete(ids=[doc_id])
+
     def search(self, query: str, k: int = 5) -> list[VectorSearchResult]:
         count = self._collection.count()
         if count == 0:
