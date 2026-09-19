@@ -23,7 +23,21 @@ importan tanto como que funcione.
 - Auth: JWT con `pyjwt` + `pwdlib[argon2]` (no bcrypt directo, no python-jose)
 - LLMs: Gemini (vía `langchain-google-genai`, no el paquete `google-generativeai` legacy
   y deprecado)
+- Celery + Redis como broker para tareas en background (reindexado de ChromaDB). El broker
+  es el mismo `redis-dev` que usa la cache (issue #11): `REDIS_URL` / `CELERY_BROKER_URL`.
 - Tests: pytest (carpeta `tests/unit/` y `tests/integration/`, aún sin implementar)
+
+## Tareas en background (Celery)
+
+El reindexado/borrado de ChromaDB al crear/editar/eliminar productos corre en un worker de
+Celery (proceso aparte de FastAPI). Para desarrollo local hay que levantar DOS procesos:
+
+```bash
+# 1. API
+uv run uvicorn app.main:app --app-dir src --reload
+# 2. Worker de Celery (requiere redis-dev corriendo)
+uv run celery -A app.infrastructure.tasks.celery_app:celery_app worker --loglevel=info
+```
 
 ## Arquitectura — hexagonal liviana
 
