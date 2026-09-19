@@ -34,31 +34,59 @@ class ChromaDBAdapter(VectorStorePort):
         self._persist_directory = persist_directory or os.getenv(
             "CHROMA_PERSIST_DIR", DEFAULT_PERSIST_DIR
         )
-        self._client = chromadb.PersistentClient(path=self._persist_directory)
-        self._collection = self._client.get_or_create_collection(name=collection_name)
+        self._collection_name = collection_name
         self._embeddings = GoogleGenerativeAIEmbeddings(
             model=embedding_model,
             google_api_key=api_key or os.getenv("GEMINI_API_KEY"),
         )
 
+    def _open_collection(self):
+        """Abre un cliente/colección FRESCOS de ChromaDB en cada operación.
+
+        ChromaDB en modo local cachea el índice HNSW en memoria y lo persiste a disco
+        recién al hacer `close()`. Abrir fresh en cada operación + cerrar al final es lo
+        que garantiza que: (1) las escrituras de OTRO proceso (el worker de Celery
+        reindexando) se vean en lecturas posteriores, y (2) las escrituras propias queden
+        persistidas y visibles para los demás procesos. El cliente de embeddings sí se
+        reutiliza (es stateless: la parte cara es la llamada HTTP, no abrir SQLite).
+
+        Devuelve la tupla (client, collection); el caller DEBE llamar `client.close()`.
+        """
+        client = chromadb.PersistentClient(path=self._persist_directory)
+        return client, client.get_or_create_collection(name=self._collection_name)
+
     def index_documents(self, ids: list[str], texts: list[str], metadatas: list[dict]) -> None:
         if not ids:
             return
         vectors = self._embeddings.embed_documents(texts)
-        self._collection.upsert(ids=ids, embeddings=vectors, documents=texts, metadatas=metadatas)
+        client, collection = self._open_collection()
+        try:
+            collection.upsert(
+                ids=ids, embeddings=vectors, documents=texts, metadatas=metadatas
+            )
+        finally:
+            client.close()
 
     def delete_document(self, doc_id: str) -> None:
-        self._collection.delete(ids=[doc_id])
+        client, collection = self._open_collection()
+        try:
+            collection.delete(ids=[doc_id])
+        finally:
+            client.close()
 
     def search(self, query: str, k: int = 5) -> list[VectorSearchResult]:
-        count = self._collection.count()
-        if count == 0:
-            return []
+        client, collection = self._open_collection()
+        try:
+            count = collection.count()
+            if count == 0:
+                return []
 
-        query_vector = self._embeddings.embed_query(query)
-        results = self._collection.query(
-            query_embeddings=[query_vector], n_results=min(k, count)
-        )
+            query_vector = self._embeddings.embed_query(query)
+            results = collection.query(
+                query_embeddings=[query_vector], n_results=min(k, count)
+            )
+        finally:
+            client.close()
 
         ids = results.get("ids", [[]])[0]
         documents = results.get("documents", [[]])[0]
@@ -72,11 +100,9 @@ class ChromaDBAdapter(VectorStorePort):
         ]
 
 
-# Instancia única a nivel de módulo: crear un ChromaDBAdapter por request implicaría
-# abrir un nuevo PersistentClient de ChromaDB y un nuevo cliente de embeddings en cada
-# request, algo costoso e innecesario. Igual que `conversation_memory` en
-# `in_memory_conversation_memory.py`, se crea una sola vez por proceso y se expone vía
-# `get_vector_store` para inyectarla con `Depends`.
+# Instancia única a nivel de módulo (mismo patrón que `conversation_memory`): se reutiliza
+# el cliente de embeddings (stateless) por proceso. El cliente de ChromaDB se abre fresh
+# en cada operación (ver `_open_collection`) para no servir datos stale entre procesos.
 vector_store = ChromaDBAdapter()
 
 
