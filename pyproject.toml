@@ -23,6 +23,7 @@ dependencies = [
     "langchain-google-genai>=4.3.2",
     "langgraph>=1.2.10",
     "chromadb>=1.5.9",
+    "redis>=8.1.0",
 ]
 
 [build-system]
