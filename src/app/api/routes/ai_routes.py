@@ -5,8 +5,10 @@ from app.infrastructure.llm.catalog_agent import run_catalog_agent
 from app.infrastructure.db.session import get_db
 from app.infrastructure.db.product_repository import ProductRepository
 from app.infrastructure.memory.in_memory_conversation_memory import get_conversation_memory
+from app.infrastructure.vectorstore.chromadb_adapter import get_vector_store
 from app.application.product_service import ProductService
 from app.domain.ports.conversation_memory_port import ConversationMemoryPort
+from app.domain.ports.vector_store_port import VectorStorePort
 from app.api.schemas.ai_schemas import AskAIRequest, CatalogAgentRequest, CatalogAgentResponse
 import os
 from dotenv import load_dotenv
@@ -14,6 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 router = APIRouter()
+
 
 @router.post("/ask_ai")
 def ask_ai(request: AskAIRequest, db: Session = Depends(get_db)):
@@ -28,9 +31,10 @@ def catalogo(
     request: CatalogAgentRequest,
     db: Session = Depends(get_db),
     memory: ConversationMemoryPort = Depends(get_conversation_memory),
+    vector_store: VectorStorePort = Depends(get_vector_store),
 ):
     product_service = ProductService(ProductRepository(db))
     history = memory.get_history(request.session_id)
-    response = run_catalog_agent(product_service, request.message, history=history)
+    response = run_catalog_agent(product_service, vector_store, request.message, history=history)
     memory.add_interaction(request.session_id, request.message, response)
     return CatalogAgentResponse(response=response)

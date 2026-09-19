@@ -147,3 +147,6 @@ store.db
 
 # CodeGraph (índice local, se regenera solo)
 .codegraph/
+
+# ChromaDB (índice de vectores local, se regenera con app.scripts.index_catalog)
+chroma_data/
