@@ -160,3 +160,90 @@ trackear (sin mezclarlas en este PR):
   `docker compose exec chroma`.
 - Tratar CVE-2026-45829 como insumo del checklist OWASP para LLM (#27): la vía de
   prompt-injection sobre `api` es el camino de pivote más plausible hacia Chroma.
+
+## Escaneo de la imagen Docker (issue #26)
+
+### Herramienta elegida: Trivy (no docker scout)
+
+`docker scout` no está disponible en este entorno (no hay plugin instalado; `docker scout`
+da "unknown command" y solo existen los plugins `buildx`, `compose` y `model`). Trivy es
+open source, no requiere suscripción ni Docker Desktop, escanea **tanto** los paquetes OS
+del base image **como** las dependencias Python del `.venv`, y se puede correr sin
+instalación local (`docker run aquasec/trivy`) o como binario estático (acá se usó
+`trivy v0.74.0`). Es además la opción más fácil de integrar a CI más adelante
+(`aquasecurity/trivy-action`). Por eso se eligió Trivy.
+
+Comando: `trivy image --scanners vuln ia-store:test` (imagen buildeada con
+`docker build -t ia-store:test .`).
+
+### Resultados reales (antes del endurecimiento)
+
+| Objetivo | Total | CRITICAL | HIGH | MEDIUM | LOW | Observación |
+|---|---|---|---|---|---|---|
+| Base image `python:3.12-slim` (Debian 13.7) | 150 | 0 | 44 | 49 | 57 | Los 44 HIGH colapsan en **8 CVEs únicos**; sin versión parcheada en Debian 13.7 a la fecha. |
+| Python (`.venv`) | 10 | 2 | 2 | 5 | 1 | 4 de chromadb (ya analizados en #25) + 6 de pip. |
+
+Los 2 CRITICAL y 2 HIGH de Python son exactamente los **4 CVEs de chromadb** que ya
+documentó la sección anterior (issue #25): `CVE-2026-45829`/`-45833`/`-45830`/`-45831`.
+No se repite el análisis acá; ver "Hallazgos actuales (chromadb 1.5.9)" más arriba. Trivy
+los califica igual que NVD (2 CRITICAL, 2 HIGH), y el análisis de mitigación por topología
+de red sigue valiendo.
+
+### Hallazgos NUEVOS (no cubiertos por #25)
+
+**pip (6 CVEs: 5 MEDIUM, 1 LOW).** Provienen del Python **de sistema** que trae
+`python:3.12-slim` (`pip 25.0.1` en `/usr/local/lib/python3.12/site-packages`), **no** del
+`.venv` de la app. La app corre desde `/app/.venv` (que no incluye pip), así que ese pip
+es superficie muerta: nunca se ejecuta. Los 6 tenían `fix_versions` disponibles (25.3+).
+**Mitigación aplicada:** se elimina pip del Python de sistema en el Dockerfile, lo que
+borra los 6 hallazgos (10 → 4 en Python).
+
+**Paquetes OS del base image (44 HIGH → 8 CVEs únicos).** La imagen base Debian 13.7 trae
+paquetes estándar que NVD cataloga HIGH por CVSS genérico, pero que no son alcanzables en
+este contenedor por diseño:
+
+| CVE(s) | Paquete | Requiere para explotar | ¿Mitigado acá? |
+|---|---|---|---|
+| `CVE-2026-76642`, `-78408`, `-78409`, `-78410` | util-linux (`mount`/`nsenter`/`unshare`) | Binarios setuid de `mount` + `CAP_SYS_ADMIN` para montar / hooks `X-mount` privilegiados | **Sí**: usuario no-root (UID 1001), sin `CAP_SYS_ADMIN`, y se **quitaron los bits setuid/setgid** en el Dockerfile. |
+| `CVE-2025-69720` | ncurses (`libncursesw6`/`libtinfo6`) | Desbordamiento de buffer vía entrada de terminal interactiva | **Sí**: la app no tiene TUI/terminal interactivo. |
+| `CVE-2026-16742` | systemd (`libsystemd0`/`libudev1`) | `systemd-homed` corriendo (privilege escalation local) | **Sí**: no corre `systemd-homed` dentro del contenedor. |
+| `CVE-2026-54369` | acl (`libacl1`) | Proceso privilegiado usando `libacl` sobre rutas controladas por el atacante | **Sí**: la app no invoca `libacl` sobre rutas atacables. |
+| `CVE-2026-9538` | perl-base (`Archive::Tar`) | Procesar archivos `.tar` con `perl`/`Archive::Tar` | **Sí**: la app no descomprime tars con perl. |
+
+**Riesgo residual neto (OS).** Estos 8 CVEs no tienen parche publicado en Debian 13.7
+todavía (`fixed=None` en Trivy), así que un `docker build --pull` hoy **no** los elimina
+del reporte (sí conviene correrlo periódicamente para tomar los fixes de Debian cuando
+salgan). La mitigación real es que el contenedor no tiene ni los privilegios
+(`CAP_SYS_ADMIN`, setuid) ni los binarios/caminos de ejecución que esos CVEs necesitan.
+El riesgo residual honesto: si un atacante lograra un **escape del contenedor** (bug de
+kernel/runtime) o elevación a root dentro del contenedor, algunos (ej. los de util-linux)
+volverían a ser relevantes; por eso el objetivo de fondo es **no llegar a ese punto**
+(usuario no-root, setuid limpio, base mínima).
+
+### Endurecimiento aplicado en este issue
+
+1. **Quitar pip/setuptools del Python de sistema** (superficie muerta + 6 CVEs).
+2. **Quitar bits setuid/setgid** de los binarios del base image (`mount`, `umount`, `su`,
+   `passwd`, `chsh`, `chfn`, `newgrp`, `gpasswd`, `unix_chkpwd`, `expiry`, `chage`, …).
+   En un contenedor no-root no se necesitan y son la vía de entrada de los CVEs de
+   util-linux/shadow/acl.
+3. Lo ya logrado en #18 se mantiene: usuario no-root `app` (UID 1001), base
+   `python:3.12-slim`, multi-stage sin secretos/`.env` en la imagen.
+
+Resultado tras el endurecimiento: Python pasa de 10 a 4 hallazgos (solo chromadb). El OS
+sigue reportando 150 porque Trivy reporta a nivel de **paquete** y no puede ver que los
+bits setuid se quitaron; la reducción es de *explotabilidad*, no de *reporte*.
+
+### Recomendaciones para trackear (no en este PR)
+
+- Integrar el escaneo de imagen a CI (step de `aquasecurity/trivy-action` o
+  `docker run aquasec/trivy`) para que no se haga solo a mano — issue nuevo.
+- Rebuildear la imagen con `docker build --pull` de forma periódica para tomar los fixes
+  de Debian de los 8 CVEs OS en cuanto salgan.
+- **Read-only root filesystem**: factible en principio — el código de la app no escribe
+  a disco (verificado: no hay `open(...,'w')`/`write_text`/`tempfile` en `src/`); si se
+  habilita (`read_only: true` + `tmpfs` para `/tmp`), conviene probar API y worker.
+- **HEALTHCHECK** en el Dockerfile: posible pero requiere un check basado en Python
+  (la imagen slim no trae `curl`/`wget`); opcional.
+- Verificación: la imagen sigue buildeando y corriendo (uvicorn arranca
+  "Application startup complete" y el worker de Celery levanta; ver PR).

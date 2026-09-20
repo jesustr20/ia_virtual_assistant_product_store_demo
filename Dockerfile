@@ -49,6 +49,19 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
+# Endurecimiento (issue #26): quitar pip del Python de sistema. `python:3.12-slim`
+# lo trae por defecto, pero la app corre desde /app/.venv, así que el pip de
+# sistema es superficie de ataque muerta (trivy reporta CVEs de pip sobre él).
+RUN rm -rf /usr/local/lib/python3.12/site-packages/pip* \
+           /usr/local/lib/python3.12/site-packages/setuptools*
+
+# Endurecimiento (issue #26): quitar los bits setuid/setgid de los binarios del base
+# image que la app no usa (mount, umount, su, passwd, chsh, chfn, newgrp, gpasswd,
+# etc.). En un contenedor no-root no son necesarios y son la vía de entrada de los
+# CVEs de util-linux/shadow/acl que reporta el escaneo. `find` es más robusto que
+# listar binarios a mano ante cambios de la imagen base.
+RUN find / -xdev -type f \( -perm -4000 -o -perm -2000 \) -exec chmod -s {} + 2>/dev/null || true
+
 # Usuario no-root dedicado (UID/GID fijos para consistencia).
 RUN groupadd --gid 1001 app \
     && useradd --uid 1001 --gid app --home-dir /app --create-home app
