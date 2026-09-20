@@ -6,15 +6,16 @@ from langchain_core.messages import AIMessageChunk
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from ...application.product_service import ProductService
+from ...core.security.agent_capabilities import select_allowed_tools
 from ...domain.entities.conversation_message import ConversationMessage
 from ...domain.ports.vector_store_port import VectorStorePort
 from .product_tools import build_catalog_tools
 from .tracing import GEMINI_FLASH_LITE, traced_llm_call
 
 SYSTEM_PROMPT = """Sos el asistente de Catálogo y Ventas de una tienda online.
-Tenés herramientas para buscar productos, consultar stock y calcular precios con
-descuento. Usá siempre las herramientas disponibles para responder con datos reales
-en lugar de inventar información. Respondé en español, de forma breve y clara."""
+Podés: buscar productos, consultar stock y calcular precios con descuento (solo con tus herramientas).
+No podés: crear, cancelar ni confirmar pedidos, procesar pagos, hacer reembolsos ni modificar órdenes — no tenés herramientas para eso y esa funcionalidad no existe. Si el usuario lo pide, decile que no podés hacerlo.
+Usá siempre tus herramientas para responder con datos reales; nunca inventes ni confirmes una acción que no hayas ejecutado. Respondé en español, de forma breve y clara."""
 
 
 def build_catalog_agent(
@@ -26,12 +27,18 @@ def build_catalog_agent(
 
     Se crea por request porque las tools quedan atadas al ProductService (y por lo
     tanto a la sesión de base de datos) de esa request.
+
+    El conjunto de tools NO se hardcodea acá: se deriva del registro de capacidades
+    (`core/security/agent_capabilities.py`, issue #23). `select_allowed_tools` filtra
+    las tools disponibles y deja pasar solo las registradas para "catalogo", de modo
+    que una tool nueva no registrada jamás llega al agente.
     """
     llm = ChatGoogleGenerativeAI(
         model=GEMINI_FLASH_LITE,
         google_api_key=api_key or os.getenv("GEMINI_API_KEY"),
     )
-    tools = build_catalog_tools(product_service, vector_store)
+    available_tools = build_catalog_tools(product_service, vector_store)
+    tools = select_allowed_tools("catalogo", available_tools)
     return create_agent(model=llm, tools=tools, system_prompt=SYSTEM_PROMPT)
 
 
