@@ -22,8 +22,17 @@ jobs:
       - name: Lint con ruff
         run: uv run ruff check .
 
+      - name: Tests unitarios con pytest
+        run: uv run pytest
+
+      # El smoke test cubre el import COMPLETO de la app (incluye chromadb, sentry,
+      # routers, etc.), algo que los tests unitarios no hacen a propósito (son
+      # aislados y rápidos). Se mantiene como check separado.
       - name: Smoke test — la app importa sin romperse
         env:
           DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/ci_db
           GEMINI_API_KEY: dummy-key-for-ci-smoke-test
         run: uv run python -c "import sys; sys.path.insert(0, 'src'); from app.main import app; print('App importa OK')"
+
+      - name: Build de Docker (valida el Dockerfile, no pushea)
+        run: docker build -t ia-store:test .
