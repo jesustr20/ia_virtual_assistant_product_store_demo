@@ -1,11 +1,11 @@
-import logging
+import structlog
 
 import redis
 
 from ...domain.ports.cache_port import CachePort
 from ..redis_client import build_redis_client, redis_client
 
-logger = logging.getLogger("app")
+logger = structlog.get_logger(component="cache")
 
 
 class RedisCacheAdapter(CachePort):
@@ -29,14 +29,14 @@ class RedisCacheAdapter(CachePort):
         try:
             return self._client.get(key)
         except redis.exceptions.RedisError:
-            logger.exception("Redis no disponible al leer la clave %s", key)
+            logger.exception("Redis no disponible al leer la clave", key=key)
             return None
 
     def set(self, key: str, value: str, ttl_seconds: int) -> None:
         try:
             self._client.set(key, value, ex=ttl_seconds)
         except redis.exceptions.RedisError:
-            logger.exception("Redis no disponible al escribir la clave %s", key)
+            logger.exception("Redis no disponible al escribir la clave", key=key)
 
 
 # Instancia única a nivel de módulo: un solo cliente de Redis por proceso, inyectado

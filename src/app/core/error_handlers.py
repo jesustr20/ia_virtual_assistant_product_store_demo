@@ -1,4 +1,4 @@
-import logging
+import structlog
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -6,7 +6,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .exceptions import AppException
 
-logger = logging.getLogger("app")
+logger = structlog.get_logger(component="error_handlers")
 
 
 async def app_exception_handler(request: Request, exc: AppException):

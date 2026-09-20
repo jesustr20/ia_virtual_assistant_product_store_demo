@@ -1,7 +1,10 @@
 import os
 
 from celery import Celery
+from celery.signals import worker_process_init
 from dotenv import load_dotenv
+
+from ...core.logging_config import configure_logging
 
 load_dotenv()
 
@@ -27,3 +30,14 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
 )
+
+
+@worker_process_init.connect
+def _configure_worker_logging(**kwargs) -> None:
+    """Configura structlog en cada proceso hijo del worker de Celery.
+
+    El worker corre en un proceso aparte de FastAPI; `worker_process_init` se dispara
+    al iniciar cada proceso hijo (donde se ejecutan las tasks), de modo que los logs de
+    `catalog_tasks.py` salgan como JSON igual que en el proceso web.
+    """
+    configure_logging()
