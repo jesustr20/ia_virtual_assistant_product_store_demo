@@ -1,6 +1,8 @@
 import os
+from collections.abc import Iterator
 
 from langchain.agents import create_agent
+from langchain_core.messages import AIMessageChunk
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from ...application.product_service import ProductService
@@ -46,11 +48,46 @@ def run_catalog_agent(
     referencias como "esas" o "ese producto" a partir de lo hablado antes.
     """
     agent = build_catalog_agent(product_service, vector_store, api_key=api_key)
-    messages = [{"role": m.role, "content": m.content} for m in (history or [])]
-    messages.append({"role": "user", "content": message})
-    result = agent.invoke({"messages": messages})
+    result = agent.invoke({"messages": _build_messages(history, message)})
     final_message = result["messages"][-1]
     return _extract_text(final_message.content)
+
+
+def stream_catalog_agent(
+    product_service: ProductService,
+    vector_store: VectorStorePort,
+    message: str,
+    history: list[ConversationMessage] | None = None,
+    api_key: str | None = None,
+) -> Iterator[str]:
+    """Variante streaming de `run_catalog_agent`: devuelve un generador de tokens.
+
+    Usa `stream_mode="messages"` de LangGraph, que emite token por token (el modelo es
+    `ChatGoogleGenerativeAI`, que soporta streaming nativo). Solo se emiten los tokens
+    del mensaje final del asistente: se descartan los chunks de tool-calls (contenido
+    vacío o bloques `tool_use`) y los resultados de las tools (`ToolMessageChunk`), que
+    no deben llegar al cliente.
+
+    El caller debe consumir el generador completo y, al final, persistir el texto
+    acumulado (ver `catalogo_stream` en `api/routes/ai_routes.py`).
+    """
+    agent = build_catalog_agent(product_service, vector_store, api_key=api_key)
+    for chunk, _metadata in agent.stream(
+        {"messages": _build_messages(history, message)}, stream_mode="messages"
+    ):
+        if isinstance(chunk, AIMessageChunk):
+            text = _extract_text(chunk.content)
+            if text:
+                yield text
+
+
+def _build_messages(
+    history: list[ConversationMessage] | None, message: str
+) -> list[dict]:
+    """Arma la lista de mensajes para el agente: historial + mensaje nuevo del usuario."""
+    messages = [{"role": m.role, "content": m.content} for m in (history or [])]
+    messages.append({"role": "user", "content": message})
+    return messages
 
 
 def _extract_text(content) -> str:
