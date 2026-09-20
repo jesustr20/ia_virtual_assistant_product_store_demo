@@ -1,5 +1,10 @@
 # Seguridad — secretos y dependencias
 
+> **Checklist OWASP Top 10 for LLM Applications (2026)** aplicado al proyecto: ver
+> [`OWASP_LLM_CHECKLIST.md`](OWASP_LLM_CHECKLIST.md) (issue #27). Este archivo cubre
+> secretos, dependencias y la imagen Docker; el checklist cubre los riesgos específicos
+> de LLM.
+
 ## Principios
 
 - Los secretos viven **solo en `.env`**, que está en `.gitignore` y **nunca se commitea**.
