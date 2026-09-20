@@ -1,16 +1,11 @@
 import logging
-import os
 
 import redis
-from dotenv import load_dotenv
 
 from ...domain.ports.cache_port import CachePort
-
-load_dotenv()
+from ..redis_client import build_redis_client, redis_client
 
 logger = logging.getLogger("app")
-
-DEFAULT_REDIS_URL = "redis://localhost:6379/0"
 
 
 class RedisCacheAdapter(CachePort):
@@ -26,13 +21,9 @@ class RedisCacheAdapter(CachePort):
     """
 
     def __init__(self, url: str | None = None):
-        self._url = url or os.getenv("REDIS_URL", DEFAULT_REDIS_URL)
-        self._client = redis.Redis.from_url(
-            self._url,
-            decode_responses=True,
-            socket_connect_timeout=1,
-            socket_timeout=1,
-        )
+        # Reusa el cliente Redis compartido (un único pool de conexiones por proceso)
+        # salvo que se pase una URL explícita (p. ej. en tests con un Redis dedicado).
+        self._client = build_redis_client(url) if url else redis_client
 
     def get(self, key: str) -> str | None:
         try:
