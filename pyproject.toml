@@ -39,4 +39,11 @@ packages = ["src/app"]
 [dependency-groups]
 dev = [
     "ruff>=0.15.20",
+    "pytest>=9.1.1",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# El paquete vive en src/ (mismo layout que usa `uvicorn --app-dir src`). Agregamos
+# src/ a sys.path para que `import app...` funcione en los tests sin instalación.
+pythonpath = ["src"]
