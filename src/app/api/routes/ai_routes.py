@@ -1,7 +1,7 @@
 import json
-import logging
 import os
 
+import structlog
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
@@ -24,7 +24,7 @@ from app.api.dependencies import enforce_rate_limit
 
 load_dotenv()
 
-logger = logging.getLogger("app")
+logger = structlog.get_logger(component="catalogo_stream")
 
 router = APIRouter()
 
@@ -133,8 +133,7 @@ def catalogo_stream(
                 yield _sse_chunk(chunk)
         except Exception:
             logger.exception(
-                "Error generando respuesta streaming para la sesión %s",
-                request.session_id,
+                "Error generando respuesta streaming", session_id=request.session_id
             )
             # Señal de error explícita para el cliente: si no, el stream moriría en
             # silencio y el cliente no sabría distinguir un fin limpio de un fallo.

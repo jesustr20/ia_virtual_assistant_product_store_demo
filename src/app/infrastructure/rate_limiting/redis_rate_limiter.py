@@ -1,11 +1,11 @@
-import logging
+import structlog
 
 import redis
 
 from ...domain.ports.rate_limiter_port import RateLimiterPort
 from ..redis_client import redis_client
 
-logger = logging.getLogger("app")
+logger = structlog.get_logger(component="rate_limiter")
 
 # Ventana fija con INCR + EXPIRE, en un solo script Lua para que sea atómico.
 #
@@ -45,7 +45,7 @@ class RedisRateLimiter(RateLimiterPort):
             return current <= limit
         except redis.exceptions.RedisError:
             logger.exception(
-                "Redis no disponible al aplicar rate limiting a la clave %s", key
+                "Redis no disponible al aplicar rate limiting a la clave", key=key
             )
             return True
 

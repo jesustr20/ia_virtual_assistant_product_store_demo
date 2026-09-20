@@ -1,8 +1,12 @@
+import structlog
+
 from ...application.catalog_indexing_service import CatalogIndexingService
 from ..db.product_repository import ProductRepository
 from ..db.session import SessionLocal
 from ..vectorstore.chromadb_adapter import ChromaDBAdapter
 from .celery_app import celery_app
+
+logger = structlog.get_logger(component="celery.catalog_tasks")
 
 
 @celery_app.task(name="catalog.reindex_product")
@@ -14,6 +18,7 @@ def reindex_product(product_id: int) -> None:
     request) y una instancia fresca de ChromaDBAdapter (el singleton del proceso web no
     se comparte entre procesos).
     """
+    logger.info("Reindexando producto en ChromaDB", product_id=product_id)
     db = SessionLocal()
     try:
         product_repo = ProductRepository(db)
@@ -26,5 +31,6 @@ def reindex_product(product_id: int) -> None:
 @celery_app.task(name="catalog.remove_product_from_index")
 def remove_product_from_index(product_id: int) -> None:
     """Elimina un producto del índice de ChromaDB (producto eliminado)."""
+    logger.info("Eliminando producto del índice de ChromaDB", product_id=product_id)
     vector_store = ChromaDBAdapter()
     vector_store.delete_document(str(product_id))

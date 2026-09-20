@@ -7,12 +7,15 @@ from .api.routes.ai_routes import router as ai_router
 from .api.routes.product_routes import router as product_router
 from .api.routes.auth_routes import router as auth_router
 from .core.exceptions import AppException
+from .core.logging_config import configure_logging
 from .core.error_handlers import (
     app_exception_handler,
     http_exception_handler,
     validation_exception_handler,
     generic_exception_handler,
 )
+
+configure_logging()
 
 app = FastAPI()
 
