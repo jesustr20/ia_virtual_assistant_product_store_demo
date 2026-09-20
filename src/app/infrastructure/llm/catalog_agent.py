@@ -9,6 +9,7 @@ from ...application.product_service import ProductService
 from ...domain.entities.conversation_message import ConversationMessage
 from ...domain.ports.vector_store_port import VectorStorePort
 from .product_tools import build_catalog_tools
+from .tracing import GEMINI_FLASH_LITE, traced_llm_call
 
 SYSTEM_PROMPT = """Sos el asistente de Catálogo y Ventas de una tienda online.
 Tenés herramientas para buscar productos, consultar stock y calcular precios con
@@ -27,7 +28,7 @@ def build_catalog_agent(
     tanto a la sesión de base de datos) de esa request.
     """
     llm = ChatGoogleGenerativeAI(
-        model="gemini-3.5-flash-lite",
+        model=GEMINI_FLASH_LITE,
         google_api_key=api_key or os.getenv("GEMINI_API_KEY"),
     )
     tools = build_catalog_tools(product_service, vector_store)
@@ -48,7 +49,11 @@ def run_catalog_agent(
     referencias como "esas" o "ese producto" a partir de lo hablado antes.
     """
     agent = build_catalog_agent(product_service, vector_store, api_key=api_key)
-    result = agent.invoke({"messages": _build_messages(history, message)})
+    with traced_llm_call(GEMINI_FLASH_LITE, "catalog_agent.invoke") as handler:
+        result = agent.invoke(
+            {"messages": _build_messages(history, message)},
+            config={"callbacks": [handler]},
+        )
     final_message = result["messages"][-1]
     return _extract_text(final_message.content)
 
@@ -72,13 +77,16 @@ def stream_catalog_agent(
     acumulado (ver `catalogo_stream` en `api/routes/ai_routes.py`).
     """
     agent = build_catalog_agent(product_service, vector_store, api_key=api_key)
-    for chunk, _metadata in agent.stream(
-        {"messages": _build_messages(history, message)}, stream_mode="messages"
-    ):
-        if isinstance(chunk, AIMessageChunk):
-            text = _extract_text(chunk.content)
-            if text:
-                yield text
+    with traced_llm_call(GEMINI_FLASH_LITE, "catalog_agent.stream") as handler:
+        for chunk, _metadata in agent.stream(
+            {"messages": _build_messages(history, message)},
+            stream_mode="messages",
+            config={"callbacks": [handler]},
+        ):
+            if isinstance(chunk, AIMessageChunk):
+                text = _extract_text(chunk.content)
+                if text:
+                    yield text
 
 
 def _build_messages(
