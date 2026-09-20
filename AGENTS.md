@@ -146,6 +146,12 @@ dentro de funciones), verificá que el smoke test del CI tenga las env vars dumm
   (prompt injection, excessive agency) — hay un checklist planeado en el issue #27.
 - Los agentes NO deberían acceder a herramientas fuera de su rol (ej: el agente de Soporte
   no debería poder crear/modificar órdenes).
+- El límite de lo que un agente puede hacer se define en el **registro de capacidades**
+  (`core/security/agent_capabilities.py`): mapea agente -> nombres de tools permitidas, y
+  el builder del agente deriva su lista de tools de ahí (no las hardcodea). Para un agente
+  nuevo, registrá sus tools en ese archivo; una tool no registrada no llega al agente. Hoy
+  solo existe "catalogo": VENTAS y SOPORTE son solo categorías del router, sin agente ni
+  lógica real (no inventar tools ficticias para ellas).
 
 ## Qué NO hacer sin preguntar primero
 

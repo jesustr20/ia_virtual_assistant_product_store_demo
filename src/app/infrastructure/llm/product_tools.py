@@ -1,12 +1,19 @@
-from langchain_core.tools import tool
+from langchain_core.tools import BaseTool, tool
 
 from ...application.product_service import ProductService
 from ...core.exceptions import NotFoundError
 from ...domain.ports.vector_store_port import VectorStorePort
 
 
-def build_catalog_tools(product_service: ProductService, vector_store: VectorStorePort) -> list:
-    """Construye las tools de LangChain para el agente de Catálogo/Ventas.
+def build_catalog_tools(
+    product_service: ProductService, vector_store: VectorStorePort
+) -> dict[str, BaseTool]:
+    """Construye TODAS las tools de LangChain del agente de Catálogo/Ventas.
+
+    Devuelve un dict `{nombre: tool}` con las implementaciones definidas acá. Cuáles
+    llegan efectivamente al agente lo decide el registro de capacidades
+    (`core/security/agent_capabilities.py`, issue #23): si acá se define una tool nueva
+    pero no se la registra, no se expone al agente (ver `build_catalog_agent`).
 
     Las tools quedan atadas (closure) a la instancia de ProductService y al
     VectorStorePort recibidos, que a su vez encapsulan el ProductRepositoryPort
@@ -79,5 +86,6 @@ def build_catalog_tools(product_service: ProductService, vector_store: VectorSto
             f"Total: ${resultado['total']:.2f}"
         )
 
-    return [buscar_producto, consultar_stock, calcular_precio]
+    all_tools = [buscar_producto, consultar_stock, calcular_precio]
+    return {tool.name: tool for tool in all_tools}
 
