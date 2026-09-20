@@ -8,6 +8,7 @@ from .api.routes.product_routes import router as product_router
 from .api.routes.auth_routes import router as auth_router
 from .core.exceptions import AppException
 from .core.logging_config import configure_logging
+from .core.sentry_config import init_sentry
 from .core.error_handlers import (
     app_exception_handler,
     http_exception_handler,
@@ -16,6 +17,7 @@ from .core.error_handlers import (
 )
 
 configure_logging()
+init_sentry()
 
 app = FastAPI()
 
