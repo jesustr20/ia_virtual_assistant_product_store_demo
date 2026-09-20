@@ -1,6 +1,8 @@
 import os
+import threading
 
 import chromadb
+from chromadb.api import ClientAPI
 from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
@@ -43,12 +45,29 @@ class ChromaDBAdapter(VectorStorePort):
             model=embedding_model,
             google_api_key=api_key or os.getenv("GEMINI_API_KEY"),
         )
-        # HttpClient no se conecta acá: es lazy (la conexión ocurre en la primera
-        # operación). Así el app puede arrancar aunque Chroma no esté listo todavía.
-        self._client = chromadb.HttpClient(host=self._host, port=self._port)
+        # El cliente se crea LAZY en `_get_client()`: `chromadb.HttpClient.__init__`
+        # hace `get_user_identity()` (un HTTP inmediato), así que NO lo construimos acá
+        # para que importar el módulo no exija un servidor de Chroma corriendo.
+        self._client: ClientAPI | None = None
+        self._client_lock = threading.Lock()
+
+    def _get_client(self) -> ClientAPI:
+        """Devuelve el HttpClient, creándolo la primera vez que se necesita.
+
+        Doble chequeo bajo lock: solo se construye UNA vez. Sin el lock, dos threads
+        que llegan a la vez al primer uso crearían cada uno su propio `HttpClient`
+        (cada uno hace su `get_user_identity()` HTTP), y el perdedor quedaría
+        huérfano — su `System`/httpx pool nunca se liberaría (`chromadb` no tiene
+        `__del__`, solo `close()`). El lock evita esa doble construcción y esa fuga.
+        """
+        if self._client is None:
+            with self._client_lock:
+                if self._client is None:
+                    self._client = chromadb.HttpClient(host=self._host, port=self._port)
+        return self._client
 
     def _get_collection(self):
-        return self._client.get_or_create_collection(name=self._collection_name)
+        return self._get_client().get_or_create_collection(name=self._collection_name)
 
     def index_documents(self, ids: list[str], texts: list[str], metadatas: list[dict]) -> None:
         if not ids:
