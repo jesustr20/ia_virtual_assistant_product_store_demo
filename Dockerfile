@@ -59,6 +59,11 @@ WORKDIR /app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --chown=app:app src ./src
 
+# Alembic (migraciones) — se corre `alembic upgrade head` al arrancar el api en
+# docker-compose.
+COPY --chown=app:app alembic.ini ./
+COPY --chown=app:app alembic ./alembic
+
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1

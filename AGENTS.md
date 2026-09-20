@@ -39,6 +39,13 @@ uv run uvicorn app.main:app --app-dir src --reload
 uv run celery -A app.infrastructure.tasks.celery_app:celery_app worker --loglevel=info
 ```
 
+> **ChromaDB ahora es cliente/servidor (issue #19).** `ChromaDBAdapter` usa
+> `chromadb.HttpClient` (host/port desde `CHROMA_HOST`/`CHROMA_PORT`, default
+> `localhost:8000`), no `PersistentClient` embebido. Para correr **sin Docker Compose**
+> necesitás además un servidor de Chroma levantado localmente (ej. con la imagen
+> `chromadb/chroma`), no alcanza con `pip install chromadb`. La forma simple es
+> `docker compose up` (ver abajo), que lo levanta todo.
+
 ## Docker (issue #18)
 
 La imagen multi-stage (`Dockerfile`) sirve para los DOS procesos; se cambia el comando en
@@ -58,6 +65,32 @@ docker run --rm --env-file .env ia-store \
 
 Si corrés contra `postgres-dev`/`redis-dev` levantados con Docker en la misma máquina, usá
 `--network=host` en lugar de `-p` para que el contenedor alcance `localhost:5434`/`6379`.
+
+## Docker Compose (issue #19)
+
+`docker-compose.yml` levanta el stack completo: API + worker + PostgreSQL + Redis + ChromaDB.
+Los servicios se hablan por nombre de servicio (`postgres`, `redis`, `chroma`). El `api` corre
+`alembic upgrade head` antes de arrancar uvicorn (el esquema se gestiona 100% vía Alembic).
+
+```bash
+# Levantar todo (construye la imagen si hace falta)
+docker compose up --build -d
+
+# Estado de los servicios
+docker compose ps
+
+# Bajar conservando datos (volúmenes)
+docker compose down
+
+# Bajar y borrar volúmenes (borrón y cuenta nueva)
+docker compose down -v
+```
+
+Config: los secretos vienen del `.env` (`env_file`); las URLs internas y credenciales de
+desarrollo de Postgres se configuran en el compose con defaults sobrescribibles
+(`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`). Los volúmenes (`postgres_data`,
+`chroma_data`) son named volumes: los datos sobreviven a `docker compose down` y se borran
+solo con `down -v`.
 
 ## Arquitectura — hexagonal liviana
 
