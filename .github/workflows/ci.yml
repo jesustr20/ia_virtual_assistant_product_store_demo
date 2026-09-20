@@ -22,6 +22,40 @@ jobs:
       - name: Lint con ruff
         run: uv run ruff check .
 
+      # Escaneo de dependencias en busca de vulnerabilidades conocidas (issue #25).
+      #
+      # Va DESPUÉS del lint y ANTES de pytest: agrupa los checks baratos/estáticos
+      # (lint + auditoría) antes de los más lentos (pytest, smoke, docker build).
+      #
+      # Comportamiento: pip-audit falla (exit 1) ante CUALQUIER vulnerabilidad. NO
+      # soporta filtrar por severidad, así que elegimos "fail on any" + allowlist
+      # explícita de los hallazgos conocidos que hoy no tienen fix (ver abajo). Una
+      # vulnerabilidad NUEVA (no listada) sigue haciendo fallar el build.
+      #
+      # Hallazgos conocidos sin fix a la fecha (chromadb 1.5.9, la ÚLTIMA versión
+      # publicada; todos con `fix_versions: []`):
+      #   PYSEC-2026-311  CVE-2026-45829  pre-auth code injection (chromadb >= 1.0.0)
+      #   PYSEC-2026-3814 CVE-2026-45833  code injection autenticado   (>= 0.4.17)
+      #   PYSEC-2026-3815 CVE-2026-45831  RBAC cross-tenant            (>= 0.5.0)
+      #   PYSEC-2026-3813 CVE-2026-45830  falta de autorización        (>= 0.4.17)
+      #
+      # OJO: pip-audit reporta "Found 5 known vulnerabilities" porque PYSEC-2026-311
+      # aparece DUPLICADO en la base OSV/PYSEC (dos advisories -> mismo CVE-2026-45829).
+      # Son 4 IDs únicos, y un solo --ignore-vuln PYSEC-2026-311 cubre las dos filas.
+      # El análisis de riesgo por CVE (qué requiere para explotar, si la topología de
+      # docker-compose lo mitiga y el riesgo residual) está en SECURITY.md.
+      #
+      # Cuando ChromaDB publique una versión parcheada: subir `chromadb` en
+      # pyproject.toml, quitar el `--ignore-vuln` correspondiente y re-correr el paso
+      # (debe quedar en verde sin el ignore). NO acumular ignores sin revisar.
+      - name: Auditoría de dependencias (pip-audit)
+        run: |
+          uv run pip-audit --skip-editable \
+            --ignore-vuln PYSEC-2026-311 \
+            --ignore-vuln PYSEC-2026-3813 \
+            --ignore-vuln PYSEC-2026-3814 \
+            --ignore-vuln PYSEC-2026-3815
+
       - name: Tests unitarios con pytest
         run: uv run pytest
 
