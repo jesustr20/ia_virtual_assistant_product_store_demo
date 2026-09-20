@@ -1,9 +1,13 @@
+import structlog
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-from ..core.exceptions import RateLimitExceededError
+from ..core.exceptions import PromptInjectionError, RateLimitExceededError
+from ..core.security.prompt_injection import detect_prompt_injection, message_fingerprint
 from ..domain.ports.rate_limiter_port import RateLimiterPort
 from ..infrastructure.security.jwt_handler import decode_access_token
+
+logger = structlog.get_logger(component="prompt_injection")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
@@ -50,3 +54,36 @@ def enforce_rate_limit(session_id: str, rate_limiter: RateLimiterPort) -> None:
     key = f"rate_limit:ai:{session_id}"
     if not rate_limiter.is_allowed(key, AI_RATE_LIMIT, AI_RATE_LIMIT_WINDOW_SECONDS):
         raise RateLimitExceededError()
+
+
+def enforce_prompt_injection_safety(message: str, session_id: str) -> None:
+    """Rechaza el mensaje si detecta patrones comunes de prompt injection (issue #22).
+
+    Se llama DENTRO del handler (igual que `enforce_rate_limit`), ANTES de gastar una
+    llamada al LLM: la detección es regex en memoria (barata) y un mensaje rechazado no
+    debe llegar al router/agente.
+
+    Decisión de diseño — RECHAZO DURO (no flag blando): si detectamos un patrón, la
+    request devuelve 400 y el mensaje NUNCA llega al LLM. Se eligió rechazo en vez de
+    "loguear y seguir" porque los patrones son lo suficientemente explícitos ("ignorá
+    tus instrucciones", "actuá como...") como para que el riesgo de falso positivo sea
+    muy bajo, mientras que dejar pasar un mensaje que sobreescribe el system prompt
+    compromete las reglas de negocio del bot (descuentos, etc.). Si en producción
+    aparecieran falsos positivos, la mitigación puede degradarse a flag blando sin
+    tocar la detección: solo cambia este handler.
+
+    Siempre se loguea el intento detectado (para revisión), con `session_id`, los
+    patrones que matchearon y un fingerprint sha256 del mensaje —pero NO el texto
+    completo, que puede contener datos personales del cliente.
+    """
+    result = detect_prompt_injection(message)
+    if not result.is_suspicious:
+        return
+
+    logger.warning(
+        "prompt_injection_detected",
+        session_id=session_id,
+        matched_patterns=list(result.matched_patterns),
+        message_fingerprint=message_fingerprint(message),
+    )
+    raise PromptInjectionError()

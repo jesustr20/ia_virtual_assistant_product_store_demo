@@ -20,7 +20,7 @@ from app.domain.ports.cache_port import CachePort, build_cache_key
 from app.domain.ports.rate_limiter_port import RateLimiterPort
 from app.infrastructure.rate_limiting.redis_rate_limiter import get_rate_limiter
 from app.api.schemas.ai_schemas import AskAIRequest, CatalogAgentRequest, CatalogAgentResponse
-from app.api.dependencies import enforce_rate_limit
+from app.api.dependencies import enforce_prompt_injection_safety, enforce_rate_limit
 
 load_dotenv()
 
@@ -55,6 +55,7 @@ def catalogo(
     rate_limiter: RateLimiterPort = Depends(get_rate_limiter),
 ):
     enforce_rate_limit(request.session_id, rate_limiter)
+    enforce_prompt_injection_safety(request.message, request.session_id)
     # Solo cacheamos el PRIMER turno de una sesión (historial vacío). El agente de
     # catálogo resuelve referencias como "esas"/"eso" a partir del historial (issue #8),
     # así que el mismo texto de follow-up ("¿cuánto cuestan esas?") puede significar
@@ -115,6 +116,7 @@ def catalogo_stream(
     # 429 como respuesta JSON normal. No tendría sentido intentar mandar un 429 a mitad
     # de un stream ya iniciado.
     enforce_rate_limit(request.session_id, rate_limiter)
+    enforce_prompt_injection_safety(request.message, request.session_id)
 
     # El stream NO usa cache (issue #11): un hit de cache es un string completo, y
     # emitirlo "de golpe" como un único chunk no aporta la mejora de latencia percibida

@@ -28,3 +28,17 @@ class RateLimitExceededError(AppException):
         message: str = "Demasiadas solicitudes. Esperá un momento y reintentá.",
     ):
         super().__init__(message, code="rate_limit_exceeded", status_code=429)
+
+
+class PromptInjectionError(AppException):
+    """Mensaje rechazado por detectar patrones de prompt injection (issue #22).
+
+    El mensaje al cliente es deliberadamente neutral: no revela que hay una defensa de
+    prompt injection activa (dar esa pista ayuda al atacante a iterar para evadirla).
+    """
+
+    def __init__(
+        self,
+        message: str = "No puedo procesar ese mensaje. ¿Podés reformularlo?",
+    ):
+        super().__init__(message, code="prompt_injection_detected", status_code=400)
