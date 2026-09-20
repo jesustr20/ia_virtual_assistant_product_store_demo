@@ -40,6 +40,7 @@ packages = ["src/app"]
 dev = [
     "ruff>=0.15.20",
     "pytest>=9.1.1",
+    "pip-audit>=2.10.1",
 ]
 
 [tool.pytest.ini_options]
