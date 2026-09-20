@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Entorno / secrets (NUNCA van en la imagen)
+.env
+.env.*
+!.env.example
+
+# Python local
+.venv
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Índices y datos locales (se regeneran; no van en la imagen)
+chroma_data/
+store.db
+*.db
+*.sqlite3
+
+# CodeGraph (índice local, se regenera solo)
+.codegraph/
+
+# CI / docs / scripts (no se copian en la imagen)
+.github/
+tests/
+scripts/
+*.md
+!README.md
+scaffold_structure.sh
+
+# Docker (el propio contexto no necesita estos)
+Dockerfile
+.dockerignore

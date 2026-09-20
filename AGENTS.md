@@ -39,6 +39,26 @@ uv run uvicorn app.main:app --app-dir src --reload
 uv run celery -A app.infrastructure.tasks.celery_app:celery_app worker --loglevel=info
 ```
 
+## Docker (issue #18)
+
+La imagen multi-stage (`Dockerfile`) sirve para los DOS procesos; se cambia el comando en
+`docker run`. Se construye una vez y se usa para web y worker. Los secretos/config se pasan
+por env en runtime (nunca se buildean en la imagen).
+
+```bash
+docker build -t ia-store .
+
+# API web (comando por defecto)
+docker run --rm -p 8000:8000 --env-file .env ia-store
+
+# Worker de Celery (sobrescribiendo el comando)
+docker run --rm --env-file .env ia-store \
+  celery -A app.infrastructure.tasks.celery_app:celery_app worker --loglevel=info
+```
+
+Si corrés contra `postgres-dev`/`redis-dev` levantados con Docker en la misma máquina, usá
+`--network=host` en lugar de `-p` para que el contenedor alcance `localhost:5434`/`6379`.
+
 ## Arquitectura — hexagonal liviana
 
 ```
