@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from ..schemas.router_schemas import RouteMessageRequest, RouteMessageResponse
-from ..dependencies import enforce_rate_limit
+from ..dependencies import enforce_prompt_injection_safety, enforce_rate_limit
 from ...domain.ports.rate_limiter_port import RateLimiterPort
 from ...infrastructure.rate_limiting.redis_rate_limiter import get_rate_limiter
 from ...infrastructure.llm.gemini_router_adapter import GeminiRouterAdapter
@@ -21,5 +21,6 @@ def route_message(
     service: RouteMessageService = Depends(get_route_service),
 ):
     enforce_rate_limit(request.session_id, rate_limiter)
+    enforce_prompt_injection_safety(request.message, request.session_id)
     category = service.route(request.message)
     return RouteMessageResponse(category=category)
