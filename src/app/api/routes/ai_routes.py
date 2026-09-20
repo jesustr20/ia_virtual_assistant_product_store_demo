@@ -11,7 +11,10 @@ from app.application.product_service import ProductService
 from app.domain.ports.conversation_memory_port import ConversationMemoryPort
 from app.domain.ports.vector_store_port import VectorStorePort
 from app.domain.ports.cache_port import CachePort, build_cache_key
+from app.domain.ports.rate_limiter_port import RateLimiterPort
+from app.infrastructure.rate_limiting.redis_rate_limiter import get_rate_limiter
 from app.api.schemas.ai_schemas import AskAIRequest, CatalogAgentRequest, CatalogAgentResponse
+from app.api.dependencies import enforce_rate_limit
 import os
 from dotenv import load_dotenv
 
@@ -43,7 +46,9 @@ def catalogo(
     memory: ConversationMemoryPort = Depends(get_conversation_memory),
     vector_store: VectorStorePort = Depends(get_vector_store),
     cache: CachePort = Depends(get_cache),
+    rate_limiter: RateLimiterPort = Depends(get_rate_limiter),
 ):
+    enforce_rate_limit(request.session_id, rate_limiter)
     # Solo cacheamos el PRIMER turno de una sesión (historial vacío). El agente de
     # catálogo resuelve referencias como "esas"/"eso" a partir del historial (issue #8),
     # así que el mismo texto de follow-up ("¿cuánto cuestan esas?") puede significar

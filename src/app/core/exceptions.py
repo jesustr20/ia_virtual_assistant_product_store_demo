@@ -20,3 +20,11 @@ class InvalidCredentialsError(AppException):
 class UserAlreadyExistsError(AppException):
     def __init__(self, message: str = "El usuario ya existe"):
         super().__init__(message, code="user_already_exists", status_code=400)
+
+
+class RateLimitExceededError(AppException):
+    def __init__(
+        self,
+        message: str = "Demasiadas solicitudes. Esperá un momento y reintentá.",
+    ):
+        super().__init__(message, code="rate_limit_exceeded", status_code=429)
