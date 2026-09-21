@@ -2,7 +2,7 @@ import structlog
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-from ..core.exceptions import PromptInjectionError, RateLimitExceededError
+from ..core.exceptions import ForbiddenError, PromptInjectionError, RateLimitExceededError
 from ..core.security.prompt_injection import detect_prompt_injection, message_fingerprint
 from ..domain.ports.rate_limiter_port import RateLimiterPort
 from ..infrastructure.security.jwt_handler import decode_access_token
@@ -35,6 +35,22 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
             detail="No se pudo validad el token",
             headers={"WWW-Authenticate":"Bearer"},
         )
+
+
+def require_admin(
+    token: str = Depends(oauth2_scheme),
+    username: str = Depends(get_current_user),
+) -> str:
+    """Dependency que exige rol admin además de un JWT válido (issue #28).
+
+    Se apoya en `get_current_user` para validar la autenticación (401 si el token es
+    inválido) y después decodifica el `role` del propio token —que viaja embebido en el
+    JWT desde el login, sin consultar la DB— para rechazar con 403 si no es admin.
+    """
+    payload = decode_access_token(token)
+    if payload.get("role") != "admin":
+        raise ForbiddenError()
+    return username
 
 
 def enforce_rate_limit(session_id: str, rate_limiter: RateLimiterPort) -> None:

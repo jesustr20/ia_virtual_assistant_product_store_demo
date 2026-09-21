@@ -9,9 +9,12 @@ class UserRepository(UserRepositoryPort):
     def get_by_username(self, username:str):
         return self.db.query(User).filter(User.username == username).first()
     
-    def create_user(self, username: str, hashed_password: str):
-        new_user = User(username=username, hashed_password=hashed_password)
+    def create_user(self, username: str, hashed_password: str, role: str = "user"):
+        new_user = User(username=username, hashed_password=hashed_password, role=role)
         self.db.add(new_user)
         self.db.commit()
         self.db.refresh(new_user)
         return new_user
+
+    def count_users(self) -> int:
+        return self.db.query(User).count()
