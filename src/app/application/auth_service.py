@@ -11,11 +11,13 @@ class AuthService:
         if existing:
             raise UserAlreadyExistsError()
         hashed = hash_password(password)
-        return self.repo.create_user(username, hashed)
+        # El primer usuario del sistema es admin automáticamente; el resto, user (issue #28).
+        role = "admin" if self.repo.count_users() == 0 else "user"
+        return self.repo.create_user(username, hashed, role)
 
     def login(self, username: str, password: str) -> str:
         user = self.repo.get_by_username(username)
         if not user or not verify_password(password, user.hashed_password):
             raise InvalidCredentialsError()
-        token = create_access_token({"sub": user.username})
+        token = create_access_token({"sub": user.username, "role": user.role})
         return token

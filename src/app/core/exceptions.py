@@ -22,6 +22,13 @@ class UserAlreadyExistsError(AppException):
         super().__init__(message, code="user_already_exists", status_code=400)
 
 
+class ForbiddenError(AppException):
+    """Usuario autenticado pero sin rol suficiente para la acción (issue #28)."""
+
+    def __init__(self, message: str = "No tenés permisos para realizar esta acción"):
+        super().__init__(message, code="forbidden", status_code=403)
+
+
 class RateLimitExceededError(AppException):
     def __init__(
         self,

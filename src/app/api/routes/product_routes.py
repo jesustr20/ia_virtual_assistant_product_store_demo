@@ -7,7 +7,7 @@ from app.infrastructure.db.product_repository import ProductRepository
 from app.infrastructure.db.session import get_db
 from app.infrastructure.tasks.catalog_tasks import reindex_product, remove_product_from_index
 
-from ..dependencies import get_current_user
+from ..dependencies import require_admin
 
 router = APIRouter()
 
@@ -16,7 +16,7 @@ router = APIRouter()
 def create_product(
     product: ProductCreate,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: str = Depends(require_admin),
 ):
     product_repo = ProductRepository(db)
     new_product = product_repo.create_product(product)
@@ -47,7 +47,7 @@ def update_product(
     product_id: int,
     product: ProductCreate,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: str = Depends(require_admin),
 ):
     product_repo = ProductRepository(db)
     updated_product = product_repo.update_product(product_id, product)
@@ -61,7 +61,7 @@ def update_product(
 def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: str = Depends(require_admin),
 ):
     product_repo = ProductRepository(db)
     product = product_repo.delete_product(product_id)

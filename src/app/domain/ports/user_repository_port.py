@@ -9,6 +9,14 @@ class UserRepositoryPort(ABC):
         pass
 
     @abstractmethod
-    def create_user(self, username: str, hashed_password: str) -> object:
-        """"Crea un usuario nuevo con la contraseña ya hasheada"""
+    def create_user(self, username: str, hashed_password: str, role: str) -> object:
+        """"Crea un usuario nuevo con la contraseña ya hasheada y un rol dado."""
+        pass
+
+    @abstractmethod
+    def count_users(self) -> int:
+        """Devuelve la cantidad total de usuarios registrados.
+
+        Se usa para decidir el rol del primer usuario (admin) en el registro (issue #28).
+        """
         pass
